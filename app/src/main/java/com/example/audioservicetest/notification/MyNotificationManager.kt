@@ -127,7 +127,7 @@ class MyNotificationManager(
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
         builder.setStyle(
             androidx.media.app.NotificationCompat.MediaStyle()
-                .setShowActionsInCompactView(1)
+                .setShowActionsInCompactView(0)
                 .setShowCancelButton(true)
                 .setCancelButtonIntent(closeIntent)
                 .setMediaSession(session.sessionToken)
