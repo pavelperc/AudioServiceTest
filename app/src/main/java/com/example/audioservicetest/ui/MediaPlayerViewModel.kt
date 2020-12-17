@@ -2,8 +2,6 @@ package com.example.audioservicetest.ui
 
 import android.app.Application
 import android.content.ComponentName
-import android.media.AudioManager
-import android.media.session.PlaybackState
 import android.support.v4.media.MediaBrowserCompat
 import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.MediaControllerCompat
@@ -12,8 +10,6 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
 import com.example.audioservicetest.service.AudioService
-import kotlinx.android.synthetic.main.activity_media_player.*
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -29,10 +25,11 @@ class MediaPlayerViewModel(application: Application) : AndroidViewModel(applicat
         override fun onConnected() {
             viewModelScope.launch {
                 delay(500)
-                mediaController = MediaControllerCompat(context, mediaBrowser.sessionToken).apply {
-                    registerCallback(controllerCallback)
+                mediaController = MediaControllerCompat(context, mediaBrowser.sessionToken).also { controller ->
+                    controller.registerCallback(controllerCallback)
+                    isConnected.postValue(true)
+                    playbackState.postValue(controller.playbackState)
                 }
-                isConnected.postValue(true)
             }
         }
 

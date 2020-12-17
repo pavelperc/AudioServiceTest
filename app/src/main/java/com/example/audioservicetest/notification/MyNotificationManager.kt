@@ -4,6 +4,7 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.os.Build
@@ -11,6 +12,7 @@ import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.MediaControllerCompat
 import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
@@ -20,23 +22,47 @@ import com.example.audioservicetest.ui.MediaPlayerActivity
 
 class MyNotificationManager(
     val context: Context,
-    val session: MediaSessionCompat
+    val session: MediaSessionCompat,
+    val onStop: () -> Unit
 ) {
     companion object {
+        const val TAG = "MyNotificationManager"
         val CHANNEL_ID = "com.example.test_channel"
         const val NOTIFICATION_ID = 123
         const val REQUEST_CODE = 100
 
         const val ACTION_PLAY = "com.example.play"
         const val ACTION_PAUSE = "com.example.pause"
-        const val ACTION_SEEK_NEXT = "com.example.seek.next"
-        const val ACTION_SEEK_PREV = "com.example.seek.prev"
-        private const val ACTION_CLOSE = "com.example.close"
+//        const val ACTION_SEEK_NEXT = "com.example.seek.next"
+//        const val ACTION_SEEK_PREV = "com.example.seek.prev"
+        const val ACTION_CLOSE = "com.example.close"
     }
 
-    private val mediaController = MediaControllerCompat(context, session.sessionToken)
-
     private val notificationManager = NotificationManagerCompat.from(context)
+
+    private val mediaController = MediaControllerCompat(context, session)
+    private val transportControls get() = mediaController.transportControls
+
+
+    val broadcastReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            val action = intent.action
+            when (action) {
+                ACTION_PLAY -> {
+                    transportControls.play()
+                }
+                ACTION_PAUSE -> {
+                    transportControls.pause()
+                }
+                ACTION_CLOSE -> {
+                    transportControls.stop()
+                }
+                else -> {
+                    Log.w(TAG, "unknown notification command $action")
+                }
+            }
+        }
+    }
 
     private val playIntent = PendingIntent.getBroadcast(
         context,
@@ -50,18 +76,18 @@ class MyNotificationManager(
         Intent(ACTION_PAUSE),
         PendingIntent.FLAG_CANCEL_CURRENT
     )
-    private val seekNextIntent = PendingIntent.getBroadcast(
-        context,
-        REQUEST_CODE,
-        Intent(ACTION_SEEK_NEXT),
-        PendingIntent.FLAG_CANCEL_CURRENT
-    )
-    private val seekPrevIntent = PendingIntent.getBroadcast(
-        context,
-        REQUEST_CODE,
-        Intent(ACTION_SEEK_PREV),
-        PendingIntent.FLAG_CANCEL_CURRENT
-    )
+//    private val seekNextIntent = PendingIntent.getBroadcast(
+//        context,
+//        REQUEST_CODE,
+//        Intent(ACTION_SEEK_NEXT),
+//        PendingIntent.FLAG_CANCEL_CURRENT
+//    )
+//    private val seekPrevIntent = PendingIntent.getBroadcast(
+//        context,
+//        REQUEST_CODE,
+//        Intent(ACTION_SEEK_PREV),
+//        PendingIntent.FLAG_CANCEL_CURRENT
+//    )
 
     private val closeIntent = PendingIntent.getBroadcast(
         context,
@@ -71,17 +97,13 @@ class MyNotificationManager(
     )
 
 
-    fun createNotification(
+    fun showNotification(
         state: PlaybackStateCompat,
         metadata: MediaMetadataCompat
     ): Notification {
         createChannel()
 
-        val builder = buildNotification(
-            mediaController.playbackState,
-            mediaController.metadata
-        )
-        val notification = builder.build()
+        val notification = buildNotification(state, metadata)
         notificationManager.notify(
             NOTIFICATION_ID,
             notification
@@ -89,11 +111,10 @@ class MyNotificationManager(
         return notification
     }
 
-    // build every time it is updated
     private fun buildNotification(
         state: PlaybackStateCompat,
         metadata: MediaMetadataCompat
-    ): NotificationCompat.Builder {
+    ): Notification {
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
 
         builder.setOngoing(false)
@@ -101,6 +122,7 @@ class MyNotificationManager(
             .setContentTitle(metadata.description.title)
             .setContentText(metadata.description.subtitle)
             .setColor(ContextCompat.getColor(context, R.color.purple_200))
+            .setSmallIcon(R.mipmap.ic_launcher_round)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
         builder.setStyle(
@@ -120,7 +142,7 @@ class MyNotificationManager(
                 NotificationCompat.Action(android.R.drawable.ic_media_play, "Play", playIntent)
 
         builder.addAction(playPauseAction)
-        return builder
+        return builder.build()
     }
 
     private fun createContentIntent(): PendingIntent {
