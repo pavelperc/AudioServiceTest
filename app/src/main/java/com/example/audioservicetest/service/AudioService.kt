@@ -88,8 +88,9 @@ class AudioService : MediaBrowserServiceCompat() {
         if (result != AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
             return
         }
-        // todo WHERE IN OUR APPLICATION?
-        startService(Intent(context, MediaBrowserService::class.java))
+        // todo WHERE IS IN OUR APPLICATION?
+        // should be called to not stop the service
+        startService(Intent(context, AudioService::class.java))
 
         mediaSession.isActive = true // todo WHY
 
@@ -120,6 +121,7 @@ class AudioService : MediaBrowserServiceCompat() {
     }
 
     private fun stopPlayer() {
+        Toast.makeText(this, "Stop player", Toast.LENGTH_SHORT).show()
         timer = null
         AudioManagerCompat.abandonAudioFocusRequest(audioManager, audioFocusRequest)
         stopSelf()
