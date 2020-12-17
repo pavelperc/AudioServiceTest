@@ -135,6 +135,7 @@ class AudioService : MediaBrowserServiceCompat() {
     private fun pausePlayer() {
         player.pause()
         timer = null
+        AudioManagerCompat.abandonAudioFocusRequest(audioManager, audioFocusRequest)
         val playbackState = updatePlaybackState(PlaybackStateCompat.STATE_PAUSED)
         notificationManager.showNotification(playbackState, metadata)
         stopForeground(false)
@@ -208,6 +209,7 @@ class AudioService : MediaBrowserServiceCompat() {
     override fun onDestroy() {
         try {
             context.unregisterReceiver(myNoisyAudioStreamReceiver)
+            AudioManagerCompat.abandonAudioFocusRequest(audioManager, audioFocusRequest)
         } catch (e: Exception) {
             Toast.makeText(context, "Destroy error:\n${e.message}", Toast.LENGTH_SHORT).show()
             Log.e(TAG, "onDestroy()", e)
