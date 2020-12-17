@@ -76,18 +76,6 @@ class MyNotificationManager(
         Intent(ACTION_PAUSE),
         PendingIntent.FLAG_CANCEL_CURRENT
     )
-//    private val seekNextIntent = PendingIntent.getBroadcast(
-//        context,
-//        REQUEST_CODE,
-//        Intent(ACTION_SEEK_NEXT),
-//        PendingIntent.FLAG_CANCEL_CURRENT
-//    )
-//    private val seekPrevIntent = PendingIntent.getBroadcast(
-//        context,
-//        REQUEST_CODE,
-//        Intent(ACTION_SEEK_PREV),
-//        PendingIntent.FLAG_CANCEL_CURRENT
-//    )
 
     private val closeIntent = PendingIntent.getBroadcast(
         context,
@@ -147,6 +135,7 @@ class MyNotificationManager(
 
     private fun createContentIntent(): PendingIntent {
         val intent = Intent(context, MediaPlayerActivity::class.java)
+            .setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
         return PendingIntent.getActivity(
             context,
             REQUEST_CODE,

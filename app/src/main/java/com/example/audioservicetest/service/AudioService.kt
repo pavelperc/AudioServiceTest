@@ -135,7 +135,8 @@ class AudioService : MediaBrowserServiceCompat() {
     private fun pausePlayer() {
         player.pause()
         timer = null
-        updatePlaybackState(PlaybackStateCompat.STATE_PAUSED)
+        val playbackState = updatePlaybackState(PlaybackStateCompat.STATE_PAUSED)
+        notificationManager.showNotification(playbackState, metadata)
         stopForeground(false)
     }
 
