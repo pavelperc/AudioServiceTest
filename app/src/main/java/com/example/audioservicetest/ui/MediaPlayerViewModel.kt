@@ -29,6 +29,7 @@ class MediaPlayerViewModel(application: Application) : AndroidViewModel(applicat
                     controller.registerCallback(controllerCallback)
                     isConnected.postValue(true)
                     playbackState.postValue(controller.playbackState)
+                    mediaMetadata.postValue(controller.metadata)
                 }
             }
         }
@@ -61,9 +62,15 @@ class MediaPlayerViewModel(application: Application) : AndroidViewModel(applicat
         value = PlaybackStateCompat.Builder().setState(PlaybackStateCompat.STATE_NONE, 0, 1f).build()
     }
 
+    val mediaMetadata = MutableLiveData<MediaMetadataCompat>().apply {
+        value = null
+    }
+
+
+
     private val controllerCallback = object : MediaControllerCompat.Callback() {
         override fun onMetadataChanged(metadata: MediaMetadataCompat) {
-
+            mediaMetadata.postValue(metadata)
         }
 
         override fun onPlaybackStateChanged(state: PlaybackStateCompat) {

@@ -1,6 +1,7 @@
 package com.example.audioservicetest.ui
 
 import android.os.Bundle
+import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.PlaybackStateCompat
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
@@ -31,7 +32,7 @@ class MediaPlayerActivity : AppCompatActivity() {
             val h: Long = seconds / (60 * 60) % 24
             tvTime.text = "%d:%02d:%02d".format(h, m, s)
 
-            tvPlaybackState.text = when(playbackState.state) {
+            tvPlaybackState.text = when (playbackState.state) {
                 PlaybackStateCompat.STATE_NONE -> "STATE_NONE"
                 PlaybackStateCompat.STATE_PLAYING -> "STATE_PLAYING"
                 PlaybackStateCompat.STATE_PAUSED -> "STATE_PAUSED"
@@ -43,6 +44,15 @@ class MediaPlayerActivity : AppCompatActivity() {
                 btnPlayPause.text = "Pause"
             } else {
                 btnPlayPause.text = "Play"
+            }
+        }
+        viewModel.mediaMetadata.observe(this) { metadata ->
+            if (metadata == null) {
+                tvTitle.text = "Loading Title"
+                tvSubtitle.text = "Loading Subtitle"
+            } else {
+                tvTitle.text = metadata.getString(MediaMetadataCompat.METADATA_KEY_TITLE)
+                tvSubtitle.text = metadata.getString(MediaMetadataCompat.METADATA_KEY_DISPLAY_SUBTITLE)
             }
         }
 

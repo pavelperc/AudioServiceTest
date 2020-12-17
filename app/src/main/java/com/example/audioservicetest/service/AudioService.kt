@@ -41,8 +41,8 @@ class AudioService : MediaBrowserServiceCompat() {
     private lateinit var notificationManager: MyNotificationManager
 
     private val metadata = MediaMetadataCompat.Builder()
-        .putString(MediaMetadataCompat.METADATA_KEY_TITLE, "Some Title")
-        .putString(MediaMetadataCompat.METADATA_KEY_AUTHOR, "Some Author")
+        .putString(MediaMetadataCompat.METADATA_KEY_TITLE, "Title from Metadata")
+        .putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_SUBTITLE, "Subtitle from Metadata")
         .build()
 
     private var timer: CountDownTimer? = null
@@ -198,8 +198,8 @@ class AudioService : MediaBrowserServiceCompat() {
 
         val desc = MediaDescriptionCompat.Builder()
             .setMediaId(MY_MEDIA_ID)
-            .setTitle("Sample") // todo what is metadata then???
-            .setSubtitle("Subtitile")
+            .setTitle("Media Item Title") // todo what is metadata then???
+            .setSubtitle("Media Item Subtitle")
             .build()
         val mediaItem =
             MediaBrowserCompat.MediaItem(desc, MediaBrowserCompat.MediaItem.FLAG_PLAYABLE)

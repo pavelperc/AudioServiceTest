@@ -145,9 +145,6 @@ class MyNotificationManager(
     }
 
     private fun createChannel() {
-        val notificationManager =
-            context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID, "My channel",
