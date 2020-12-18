@@ -8,7 +8,6 @@ import android.media.AudioManager
 import android.media.MediaPlayer
 import android.os.Bundle
 import android.os.CountDownTimer
-import android.service.media.MediaBrowserService
 import android.support.v4.media.MediaBrowserCompat
 import android.support.v4.media.MediaDescriptionCompat
 import android.support.v4.media.MediaMetadataCompat
@@ -16,6 +15,7 @@ import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
 import android.util.Log
 import android.widget.Toast
+import androidx.core.content.ContextCompat
 import androidx.media.AudioAttributesCompat
 import androidx.media.AudioFocusRequestCompat
 import androidx.media.AudioManagerCompat
@@ -53,11 +53,13 @@ class AudioService : MediaBrowserServiceCompat() {
 
     override fun onCreate() {
         super.onCreate()
+        player.isLooping = true
         mediaSession = MediaSessionCompat(context, TAG).apply {
 //             Set an initial PlaybackState with ACTION_PLAY, so media buttons can start the player
             val stateBuilder = PlaybackStateCompat.Builder()
                 .setActions(
                     PlaybackStateCompat.ACTION_PLAY
+                            or PlaybackStateCompat.ACTION_PLAY_PAUSE
                 )
             setPlaybackState(stateBuilder.build())
         }
@@ -88,22 +90,18 @@ class AudioService : MediaBrowserServiceCompat() {
         if (result != AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
             return
         }
-        // todo WHERE IS IN OUR APPLICATION?
-        // should be called to not stop the service
-        startService(Intent(context, AudioService::class.java))
+        // expects startForeground call with notification in 5 seconds.
+        ContextCompat.startForegroundService(context, Intent(context, AudioService::class.java))
 
         mediaSession.isActive = true // todo WHY
 
         player.start()
-        timer = object : CountDownTimer(
-            (player.duration - player.currentPosition + 100).toLong(), 1000
-        ) {
+        timer = object : CountDownTimer(Long.MAX_VALUE, 1000) {
             override fun onTick(millisUntilFinished: Long) {
                 updatePlaybackState(PlaybackStateCompat.STATE_PLAYING)
             }
 
             override fun onFinish() {
-                stopPlayer()
             }
         }.start()
 
