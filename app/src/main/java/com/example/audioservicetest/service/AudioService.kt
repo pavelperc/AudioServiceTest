@@ -9,17 +9,18 @@ import android.media.MediaPlayer
 import android.os.Bundle
 import android.os.CountDownTimer
 import android.support.v4.media.MediaBrowserCompat
-import android.support.v4.media.MediaDescriptionCompat
 import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
 import android.util.Log
+import android.view.KeyEvent
 import android.widget.Toast
 import androidx.core.content.ContextCompat
 import androidx.media.AudioAttributesCompat
 import androidx.media.AudioFocusRequestCompat
 import androidx.media.AudioManagerCompat
 import androidx.media.MediaBrowserServiceCompat
+import androidx.media.session.MediaButtonReceiver
 import com.example.audioservicetest.R
 import com.example.audioservicetest.notification.MyNotificationManager
 
@@ -54,15 +55,15 @@ class AudioService : MediaBrowserServiceCompat() {
     override fun onCreate() {
         super.onCreate()
         player.isLooping = true
-        mediaSession = MediaSessionCompat(context, TAG).apply {
-//             Set an initial PlaybackState with ACTION_PLAY, so media buttons can start the player
-            val stateBuilder = PlaybackStateCompat.Builder()
-                .setActions(
-                    PlaybackStateCompat.ACTION_PLAY
-                            or PlaybackStateCompat.ACTION_PLAY_PAUSE
-                )
-            setPlaybackState(stateBuilder.build())
-        }
+        mediaSession = MediaSessionCompat(context, TAG)
+
+        // setup available actions for media buttons.
+        val stateBuilder = PlaybackStateCompat.Builder()
+            .setActions(
+                PlaybackStateCompat.ACTION_PLAY
+                        or PlaybackStateCompat.ACTION_PLAY_PAUSE
+            )
+        mediaSession.setPlaybackState(stateBuilder.build())
 
         sessionToken = mediaSession.sessionToken
         mediaSession.setCallback(mediaSessionCallback)
@@ -75,12 +76,28 @@ class AudioService : MediaBrowserServiceCompat() {
 
         val intentFilter = IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY)
         context.registerReceiver(myNoisyAudioStreamReceiver, intentFilter)
+
+        // active session enables media controls on the lock screen
+        mediaSession.isActive = true
     }
 
     private val mediaSessionCallback = object : MediaSessionCompat.Callback() {
         override fun onPlay() = startPlayer()
         override fun onStop() = stopPlayer()
         override fun onPause() = pausePlayer()
+
+        override fun onMediaButtonEvent(mediaButtonEvent: Intent): Boolean {
+            // https://developer.android.com/guide/topics/media-apps/mediabuttons#customizing-mediabuttons
+            val keyEvent = mediaButtonEvent.getParcelableExtra<KeyEvent>(Intent.EXTRA_KEY_EVENT)
+            if (keyEvent?.keyCode == KeyEvent.KEYCODE_MEDIA_PLAY && keyEvent.action == KeyEvent.ACTION_DOWN) {
+                startPlayer()
+                return true
+            } else if (keyEvent?.keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE && keyEvent.action == KeyEvent.ACTION_DOWN) {
+                if (player.isPlaying) pausePlayer() else startPlayer()
+                return true
+            }
+            return super.onMediaButtonEvent(mediaButtonEvent)
+        }
     }
 
 
@@ -92,8 +109,6 @@ class AudioService : MediaBrowserServiceCompat() {
         }
         // expects startForeground call with notification in 5 seconds.
         ContextCompat.startForegroundService(context, Intent(context, AudioService::class.java))
-
-        mediaSession.isActive = true // todo WHY
 
         player.start()
         timer = object : CountDownTimer(Long.MAX_VALUE, 1000) {
@@ -123,7 +138,6 @@ class AudioService : MediaBrowserServiceCompat() {
         timer = null
         AudioManagerCompat.abandonAudioFocusRequest(audioManager, audioFocusRequest)
         stopSelf()
-        mediaSession.isActive = false // todo WHY DO WE NEED THIS???
         player.stop()
         player.prepare()
         player.seekTo(0)
@@ -184,8 +198,7 @@ class AudioService : MediaBrowserServiceCompat() {
         clientPackageName: String,
         clientUid: Int,
         rootHints: Bundle?
-    ): BrowserRoot? {
-        // todo understand, check why null in our application.
+    ): BrowserRoot {
         return BrowserRoot(MY_MEDIA_ROOT_ID, null)
     }
 
@@ -193,20 +206,10 @@ class AudioService : MediaBrowserServiceCompat() {
         parentMediaId: String,
         result: Result<List<MediaBrowserCompat.MediaItem>>
     ) {
-        // Assume for example that the music catalog is already loaded/cached.
-        // check MY_MEDIA_ROOT_ID
-
-        val desc = MediaDescriptionCompat.Builder()
-            .setMediaId(MY_MEDIA_ID)
-            .setTitle("Media Item Title") // todo what is metadata then???
-            .setSubtitle("Media Item Subtitle")
-            .build()
-        val mediaItem =
-            MediaBrowserCompat.MediaItem(desc, MediaBrowserCompat.MediaItem.FLAG_PLAYABLE)
-        result.sendResult(listOf(mediaItem))
     }
 
     override fun onDestroy() {
+        mediaSession.isActive = false
         try {
             context.unregisterReceiver(myNoisyAudioStreamReceiver)
             AudioManagerCompat.abandonAudioFocusRequest(audioManager, audioFocusRequest)
