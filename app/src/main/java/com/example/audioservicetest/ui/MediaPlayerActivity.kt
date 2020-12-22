@@ -57,6 +57,7 @@ class MediaPlayerActivity : AppCompatActivity() {
         }
 
         setupControls()
+        viewModel.connectToMediaService()
     }
 
     fun setupControls() {
@@ -76,14 +77,8 @@ class MediaPlayerActivity : AppCompatActivity() {
         }
     }
 
-    public override fun onStart() {
-        super.onStart()
-        viewModel.connectToMediaService()
-    }
-
-
-    public override fun onStop() {
-        super.onStop()
+    public override fun onDestroy() {
         viewModel.disconnectFromMediaService()
+        super.onDestroy()
     }
 }
