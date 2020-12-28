@@ -1,5 +1,5 @@
 <resources>
     <string name="app_name">AudioServiceTest</string>
-    <string name="notification_channel">Now Playing</string>
-    <string name="notification_channel_description">Shows what music is currently playing</string>
+    <string name="notification_channel">My Music Channel</string>
+    <string name="notification_channel_description">My Music Channel Description</string>
 </resources>

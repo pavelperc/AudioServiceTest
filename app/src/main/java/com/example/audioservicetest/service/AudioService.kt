@@ -1,28 +1,24 @@
 package com.example.audioservicetest.service
 
-import android.content.BroadcastReceiver
-import android.content.Context
+import android.app.Notification
 import android.content.Intent
-import android.content.IntentFilter
-import android.media.AudioManager
-import android.media.MediaPlayer
+import android.net.Uri
 import android.os.Bundle
-import android.os.CountDownTimer
+import android.os.ResultReceiver
 import android.support.v4.media.MediaBrowserCompat
-import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
 import android.util.Log
-import android.view.KeyEvent
 import android.widget.Toast
 import androidx.core.content.ContextCompat
-import androidx.media.AudioAttributesCompat
-import androidx.media.AudioFocusRequestCompat
-import androidx.media.AudioManagerCompat
 import androidx.media.MediaBrowserServiceCompat
-import androidx.media.session.MediaButtonReceiver
 import com.example.audioservicetest.R
 import com.example.audioservicetest.notification.MyNotificationManager
+import com.google.android.exoplayer2.*
+import com.google.android.exoplayer2.audio.AudioAttributes
+import com.google.android.exoplayer2.ext.mediasession.MediaSessionConnector
+import com.google.android.exoplayer2.ui.PlayerNotificationManager
+import com.google.android.exoplayer2.upstream.RawResourceDataSource
 
 
 class AudioService : MediaBrowserServiceCompat() {
@@ -33,166 +29,125 @@ class AudioService : MediaBrowserServiceCompat() {
     }
 
     private val context get() = applicationContext
-    private val audioManager get() = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
 
-    private val player by lazy { MediaPlayer.create(context, R.raw.sample) }
+    private val player by lazy {
+        SimpleExoPlayer.Builder(this).setAudioAttributes(
+            AudioAttributes.Builder()
+                .setContentType(C.CONTENT_TYPE_MUSIC)
+                .setUsage(C.USAGE_MEDIA) // recommended when handle audio focus
+                .build(), true // handle audio focus
+        )
+            .setHandleAudioBecomingNoisy(true) // pause player on headphones disconnect
+            .build()
+            .apply { addListener(playerEventListener) }
+    }
 
     private lateinit var mediaSession: MediaSessionCompat
-
+    private lateinit var mediaSessionConnector: MediaSessionConnector
     private lateinit var notificationManager: MyNotificationManager
 
-    private val metadata = MediaMetadataCompat.Builder()
-        .putString(MediaMetadataCompat.METADATA_KEY_TITLE, "Title from Metadata")
-        .putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_SUBTITLE, "Subtitle from Metadata")
-        .build()
-
-    private var timer: CountDownTimer? = null
-        set(value) {
-            field?.cancel()
-            field = value
-        }
+    private var isForegroundService = false
 
     override fun onCreate() {
         super.onCreate()
-        player.isLooping = true
+        player.repeatMode = Player.REPEAT_MODE_ONE
+
         mediaSession = MediaSessionCompat(context, TAG)
-
-        // setup available actions for media buttons.
-        val stateBuilder = PlaybackStateCompat.Builder()
-            .setActions(
-                PlaybackStateCompat.ACTION_PLAY
-                        or PlaybackStateCompat.ACTION_PLAY_PAUSE
-            )
-        mediaSession.setPlaybackState(stateBuilder.build())
-
         sessionToken = mediaSession.sessionToken
-        mediaSession.setCallback(mediaSessionCallback)
+
+        // ExoPlayer manages the MediaSession for us.
+        mediaSessionConnector = MediaSessionConnector(mediaSession)
+        mediaSessionConnector.setPlaybackPreparer(myPlaybackPreparer)
+        mediaSessionConnector.setPlayer(player)
 
         notificationManager = MyNotificationManager(
-            context, mediaSession,
-            onStop = { stopPlayer() }
+            context, mediaSession, player,
+            notificationListener
         )
-        mediaSession.setMetadata(metadata)
-
-        val intentFilter = IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY)
-        context.registerReceiver(myNoisyAudioStreamReceiver, intentFilter)
 
         // active session enables media controls on the lock screen
         mediaSession.isActive = true
     }
 
-    private val mediaSessionCallback = object : MediaSessionCompat.Callback() {
-        override fun onPlay() = startPlayer()
-        override fun onStop() = stopPlayer()
-        override fun onPause() = pausePlayer()
+    private val myPlaybackPreparer = object : MediaSessionConnector.PlaybackPreparer {
+        override fun getSupportedPrepareActions() =
+            PlaybackStateCompat.ACTION_PLAY or
+                    PlaybackStateCompat.ACTION_PLAY_PAUSE
 
-        override fun onMediaButtonEvent(mediaButtonEvent: Intent): Boolean {
-            // https://developer.android.com/guide/topics/media-apps/mediabuttons#customizing-mediabuttons
-            val keyEvent = mediaButtonEvent.getParcelableExtra<KeyEvent>(Intent.EXTRA_KEY_EVENT)
-            if (keyEvent?.keyCode == KeyEvent.KEYCODE_MEDIA_PLAY && keyEvent.action == KeyEvent.ACTION_DOWN) {
-                startPlayer()
-                return true
-            } else if (keyEvent?.keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE && keyEvent.action == KeyEvent.ACTION_DOWN) {
-                if (player.isPlaying) pausePlayer() else startPlayer()
-                return true
+        override fun onPrepare(playWhenReady: Boolean) {
+            val mediaItem =
+                MediaItem.fromUri(RawResourceDataSource.buildRawResourceUri(R.raw.sample))
+            player.stop(true)
+            player.setMediaItem(mediaItem)
+            player.playWhenReady = playWhenReady
+            player.prepare()
+        }
+
+        override fun onPrepareFromMediaId(
+            mediaId: String,
+            playWhenReady: Boolean,
+            extras: Bundle?
+        ) {
+            onPrepare(playWhenReady)
+        }
+
+        override fun onCommand(
+            player: Player, controlDispatcher: ControlDispatcher,
+            command: String, extras: Bundle?, cb: ResultReceiver?
+        ) = false
+
+        override fun onPrepareFromSearch(query: String, playWhenReady: Boolean, extras: Bundle?) {}
+        override fun onPrepareFromUri(uri: Uri, playWhenReady: Boolean, extras: Bundle?) {}
+
+    }
+
+    private val playerEventListener = object : Player.EventListener {
+        override fun onPlayerStateChanged(playWhenReady: Boolean, playbackState: Int) {
+            when (playbackState) {
+                Player.STATE_BUFFERING -> {
+                    // will start foreground after showing
+                    notificationManager.showNotification()
+                }
+                Player.STATE_READY -> {
+                    notificationManager.showNotification()
+
+                    if (!playWhenReady) { // paused
+                        stopForeground(false)
+                    }
+                }
+                else -> {
+                    notificationManager.hideNotification()
+                }
             }
-            return super.onMediaButtonEvent(mediaButtonEvent)
+        }
+
+        override fun onPlayerError(error: ExoPlaybackException) {
+            Log.e(TAG, "Player error:", error)
+            Toast.makeText(context, error.toString(), Toast.LENGTH_LONG).show()
         }
     }
 
-
-    private fun startPlayer() {
-        // fails if another app is playing music this time
-        val result = AudioManagerCompat.requestAudioFocus(audioManager, audioFocusRequest)
-        if (result != AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
-            return
-        }
-        // expects startForeground call with notification in 5 seconds.
-        ContextCompat.startForegroundService(context, Intent(context, AudioService::class.java))
-
-        player.start()
-        timer = object : CountDownTimer(Long.MAX_VALUE, 1000) {
-            override fun onTick(millisUntilFinished: Long) {
-                updatePlaybackState(PlaybackStateCompat.STATE_PLAYING)
-            }
-
-            override fun onFinish() {
-            }
-        }.start()
-
-        val playbackState = updatePlaybackState(PlaybackStateCompat.STATE_PLAYING)
-
-        val notification = notificationManager.showNotification(playbackState, metadata)
-
-        val filter = IntentFilter()
-        filter.addAction(MyNotificationManager.ACTION_PLAY)
-        filter.addAction(MyNotificationManager.ACTION_PAUSE)
-        filter.addAction(MyNotificationManager.ACTION_CLOSE)
-        registerReceiver(notificationManager.broadcastReceiver, filter) // what is it???
-
-        startForeground(MyNotificationManager.NOTIFICATION_ID, notification)
-    }
-
-    private fun stopPlayer() {
-        Toast.makeText(this, "Stop player", Toast.LENGTH_SHORT).show()
-        timer = null
-        AudioManagerCompat.abandonAudioFocusRequest(audioManager, audioFocusRequest)
-        stopSelf()
-        player.stop()
-        player.prepare()
-        player.seekTo(0)
-        unregisterReceiver(notificationManager.broadcastReceiver)
-        stopForeground(true)
-        updatePlaybackState(PlaybackStateCompat.STATE_STOPPED)
-    }
-
-    private fun pausePlayer() {
-        player.pause()
-        timer = null
-        AudioManagerCompat.abandonAudioFocusRequest(audioManager, audioFocusRequest)
-        val playbackState = updatePlaybackState(PlaybackStateCompat.STATE_PAUSED)
-        notificationManager.showNotification(playbackState, metadata)
-        stopForeground(false)
-    }
-
-    private fun updatePlaybackState(state: Int): PlaybackStateCompat {
-        val playbackState = PlaybackStateCompat.Builder()
-            .setState(state, player.currentPosition.toLong(), 1f, System.currentTimeMillis())
-            .build()
-        mediaSession.setPlaybackState(playbackState)
-        return playbackState
-    }
-
-    // when headphones are disconnected
-    private val myNoisyAudioStreamReceiver: BroadcastReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context, intent: Intent) {
-            Toast.makeText(context, "Headphones are disconnected", Toast.LENGTH_SHORT).show()
-            pausePlayer()
-        }
-    }
-
-    // when another app starts playing music, this callback happens
-    private val afChangeListener = AudioManager.OnAudioFocusChangeListener { focusChange ->
-        when (focusChange) {
-            AudioManager.AUDIOFOCUS_LOSS -> pausePlayer()
-            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> pausePlayer()
-            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> player.setVolume(0.5f, 0.5f)
-            AudioManager.AUDIOFOCUS_GAIN -> {
-                if (!player.isPlaying) startPlayer()
-                player.setVolume(1.0f, 1.0f)
+    private val notificationListener = object : PlayerNotificationManager.NotificationListener {
+        override fun onNotificationPosted(
+            notificationId: Int,
+            notification: Notification,
+            ongoing: Boolean
+        ) {
+            if (ongoing && !isForegroundService) {
+                ContextCompat.startForegroundService(
+                    context, Intent(context, AudioService::class.java)
+                )
+                startForeground(notificationId, notification)
+                isForegroundService = true
             }
         }
-    }
 
-    private val audioFocusRequest =
-        AudioFocusRequestCompat.Builder(AudioManagerCompat.AUDIOFOCUS_GAIN)
-            .setOnAudioFocusChangeListener(afChangeListener)
-            .setAudioAttributes(
-                AudioAttributesCompat.Builder()
-                    .setContentType(AudioAttributesCompat.CONTENT_TYPE_MUSIC)
-                    .build()
-            )
-            .build()
+        override fun onNotificationCancelled(notificationId: Int, dismissedByUser: Boolean) {
+            stopForeground(true)
+            isForegroundService = false
+            stopSelf()
+        }
+    }
 
     override fun onGetRoot(
         clientPackageName: String,
@@ -210,15 +165,7 @@ class AudioService : MediaBrowserServiceCompat() {
 
     override fun onDestroy() {
         mediaSession.isActive = false
-        try {
-            context.unregisterReceiver(myNoisyAudioStreamReceiver)
-            AudioManagerCompat.abandonAudioFocusRequest(audioManager, audioFocusRequest)
-        } catch (e: Exception) {
-            Toast.makeText(context, "Destroy error:\n${e.message}", Toast.LENGTH_SHORT).show()
-            Log.e(TAG, "onDestroy()", e)
-        }
         player.release()
-        timer = null
         Toast.makeText(context, "Service Destroyed!", Toast.LENGTH_SHORT).show()
         super.onDestroy()
     }
