@@ -53,9 +53,8 @@ class MediaPlayerActivity : AppCompatActivity() {
                 tvTitle.text = "Loading Title"
                 tvSubtitle.text = "Loading Subtitle"
             } else {
-                tvTitle.text = metadata.getString(MediaMetadataCompat.METADATA_KEY_TITLE)
-                tvSubtitle.text =
-                    metadata.getString(MediaMetadataCompat.METADATA_KEY_DISPLAY_SUBTITLE)
+                tvTitle.text = metadata.description.title ?: "null"
+                tvSubtitle.text = metadata.description.subtitle ?: "null"
             }
         }
 

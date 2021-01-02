@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.ResultReceiver
 import android.support.v4.media.MediaBrowserCompat
+import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
 import android.util.Log
@@ -34,8 +35,8 @@ class AudioService : MediaBrowserServiceCompat() {
         SimpleExoPlayer.Builder(this).setAudioAttributes(
             AudioAttributes.Builder()
                 .setContentType(C.CONTENT_TYPE_MUSIC)
-                .setUsage(C.USAGE_MEDIA) // recommended when handle audio focus
-                .build(), true // handle audio focus
+                .setUsage(C.USAGE_MEDIA)
+                .build(), true // handle audio focus (pause when a conflicting player starts)
         )
             .setHandleAudioBecomingNoisy(true) // pause player on headphones disconnect
             .build()
@@ -48,6 +49,11 @@ class AudioService : MediaBrowserServiceCompat() {
 
     private var isForegroundService = false
 
+    private val metadata = MediaMetadataCompat.Builder()
+        .putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_TITLE, "Title from Metadata")
+        .putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_SUBTITLE, "Subtitle from Metadata")
+        .build()
+
     override fun onCreate() {
         super.onCreate()
         player.repeatMode = Player.REPEAT_MODE_ONE
@@ -59,6 +65,9 @@ class AudioService : MediaBrowserServiceCompat() {
         mediaSessionConnector = MediaSessionConnector(mediaSession)
         mediaSessionConnector.setPlaybackPreparer(myPlaybackPreparer)
         mediaSessionConnector.setPlayer(player)
+        mediaSessionConnector.setMediaMetadataProvider { player ->
+            metadata
+        }
 
         notificationManager = MyNotificationManager(
             context, mediaSession, player,
@@ -105,7 +114,7 @@ class AudioService : MediaBrowserServiceCompat() {
         override fun onPlayerStateChanged(playWhenReady: Boolean, playbackState: Int) {
             when (playbackState) {
                 Player.STATE_BUFFERING -> {
-                    // will start foreground after showing
+                    // need to start foreground after showing
                     notificationManager.showNotification()
                 }
                 Player.STATE_READY -> {
@@ -131,7 +140,7 @@ class AudioService : MediaBrowserServiceCompat() {
         override fun onNotificationPosted(
             notificationId: Int,
             notification: Notification,
-            ongoing: Boolean
+            ongoing: Boolean // should be in the foreground or not
         ) {
             if (ongoing && !isForegroundService) {
                 ContextCompat.startForegroundService(
