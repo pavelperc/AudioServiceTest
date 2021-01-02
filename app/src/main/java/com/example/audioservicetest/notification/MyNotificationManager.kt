@@ -4,6 +4,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
+import android.graphics.Color
 import android.support.v4.media.session.MediaControllerCompat
 import android.support.v4.media.session.MediaSessionCompat
 import com.example.audioservicetest.R
@@ -37,6 +38,11 @@ class MyNotificationManager(
         notificationListener
     )
 
+    init {
+        notificationManager.setMediaSessionToken(session.sessionToken)
+        notificationManager.setColor(Color.GREEN)
+    }
+
     fun hideNotification() {
         notificationManager.setPlayer(null)
     }
@@ -56,8 +62,7 @@ class MyNotificationManager(
             val intent = Intent(context, MediaPlayerActivity::class.java)
                 .setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
             return PendingIntent.getActivity(
-                context, REQUEST_CODE,
-                intent, PendingIntent.FLAG_CANCEL_CURRENT
+                context, REQUEST_CODE, intent, PendingIntent.FLAG_CANCEL_CURRENT
             )
         }
 

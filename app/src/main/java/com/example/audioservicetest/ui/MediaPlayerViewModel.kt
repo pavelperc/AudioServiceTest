@@ -24,15 +24,18 @@ class MediaPlayerViewModel(application: Application) : AndroidViewModel(applicat
 
     val isConnected = MutableLiveData<Boolean>().apply { value = false }
 
+    // warning: doesn't update with the current position change
     val playbackState = MutableLiveData<PlaybackStateCompat>().apply {
-        value =
-            PlaybackStateCompat.Builder().setState(PlaybackStateCompat.STATE_NONE, 0, 1f).build()
+        value = PlaybackStateCompat.Builder()
+            .setState(PlaybackStateCompat.STATE_NONE, 0, 1f)
+            .build()
     }
 
     val playbackPosition = MutableLiveData<Long>().apply { value = 0 }
 
     val mediaMetadata = MutableLiveData<MediaMetadataCompat>().apply { value = null }
 
+    // todo maybe move to the audio service?
     private var timer: Timer? = null
         set(value) {
             field?.cancel()
