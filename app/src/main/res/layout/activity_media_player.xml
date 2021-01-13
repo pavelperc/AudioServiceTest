@@ -59,7 +59,7 @@
             android:layout_height="wrap_content"/>
         <TextView
             android:id="@+id/tvPlaybackState"
-            android:text="Playback state"
+            tools:text="Playback state"
             android:textSize="22sp"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"/>
@@ -72,7 +72,7 @@
             android:layout_height="wrap_content"/>
         <TextView
             android:id="@+id/tvConnectionState"
-            android:text="Connection state"
+            tools:text="Connection state"
             android:textSize="22sp"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"/>
