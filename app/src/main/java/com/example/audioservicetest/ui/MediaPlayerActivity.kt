@@ -8,8 +8,6 @@ import androidx.lifecycle.lifecycleScope
 import com.example.audioservicetest.R
 import kotlinx.android.synthetic.main.activity_media_player.*
 import kotlinx.coroutines.flow.collect
-import kotlinx.coroutines.launch
-
 
 class MediaPlayerActivity : AppCompatActivity() {
 
@@ -71,9 +69,9 @@ class MediaPlayerActivity : AppCompatActivity() {
         viewModel.connectToMediaService()
     }
 
-    fun setupControls() {
+    private fun setupControls() {
         btnPlayPause.setOnClickListener {
-            val playbackState = viewModel.playbackState.value!!
+            val playbackState = viewModel.playbackState.value
             when (playbackState.state) {
                 PlaybackStateCompat.STATE_PLAYING -> {
                     viewModel.pause()
