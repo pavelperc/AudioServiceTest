@@ -4,10 +4,11 @@ import android.os.Bundle
 import android.support.v4.media.session.PlaybackStateCompat
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import com.example.audioservicetest.R
 import kotlinx.android.synthetic.main.activity_media_player.*
-import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
 
@@ -15,55 +16,58 @@ class MediaPlayerActivity : AppCompatActivity() {
 
     val viewModel by viewModels<MediaPlayerViewModel>()
 
+    fun <T> Flow<T>.observe(lifecycleOwner: LifecycleOwner, action: suspend (T) -> Unit) {
+        lifecycleOwner.lifecycleScope.launchWhenCreated {
+            this@observe
+                .collect(action)
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_media_player)
 
-        lifecycleScope.launchWhenCreated {
-            viewModel.isConnected
-                .collect { isConnected ->
-                    if (isConnected) {
-                        tvConnectionState.text = "Connected to service"
-                    } else {
-                        tvConnectionState.text = "Disconnected from service"
-                    }
-                }
-        }
-        lifecycleScope.launchWhenCreated {
-            viewModel.playbackPosition.collect { position ->
-                val seconds = position / 1000
-                val s: Long = seconds % 60
-                val m: Long = seconds / 60 % 60
-                val h: Long = seconds / (60 * 60) % 24
-                tvTime.text = "%d:%02d:%02d".format(h, m, s)
-            }
-        }
-        lifecycleScope.launchWhenCreated {
-            viewModel.playbackState.collect { playbackState ->
-                tvPlaybackState.text = when (playbackState.state) {
-                    PlaybackStateCompat.STATE_NONE -> "STATE_NONE"
-                    PlaybackStateCompat.STATE_PLAYING -> "STATE_PLAYING"
-                    PlaybackStateCompat.STATE_BUFFERING -> "STATE_BUFFERING"
-                    PlaybackStateCompat.STATE_PAUSED -> "STATE_PAUSED"
-                    PlaybackStateCompat.STATE_STOPPED -> "STATE_STOPPED"
-                    else -> "Other state: ${playbackState.state}"
-                }
-                if (playbackState.state == PlaybackStateCompat.STATE_PLAYING) {
-                    btnPlayPause.text = "Pause"
+        viewModel.isConnected
+            .observe(this)
+            { isConnected ->
+                if (isConnected) {
+                    tvConnectionState.text = "Connected to service"
                 } else {
-                    btnPlayPause.text = "Play"
+                    tvConnectionState.text = "Disconnected from service"
                 }
             }
+
+        viewModel.playbackPosition.observe(this) { position ->
+            val seconds = position / 1000
+            val s: Long = seconds % 60
+            val m: Long = seconds / 60 % 60
+            val h: Long = seconds / (60 * 60) % 24
+            tvTime.text = "%d:%02d:%02d".format(h, m, s)
         }
-        lifecycleScope.launchWhenCreated {
-            viewModel.mediaMetadata.collect { metadata ->
-                if (metadata == null) {
-                    tvTitle.text = "Loading Title"
-                    tvSubtitle.text = "Loading Subtitle"
-                } else {
-                    tvTitle.text = metadata.description.title ?: "null"
-                    tvSubtitle.text = metadata.description.subtitle ?: "null"
-                }
+
+        viewModel.playbackState.observe(this) { playbackState ->
+            tvPlaybackState.text = when (playbackState.state) {
+                PlaybackStateCompat.STATE_NONE -> "STATE_NONE"
+                PlaybackStateCompat.STATE_PLAYING -> "STATE_PLAYING"
+                PlaybackStateCompat.STATE_BUFFERING -> "STATE_BUFFERING"
+                PlaybackStateCompat.STATE_PAUSED -> "STATE_PAUSED"
+                PlaybackStateCompat.STATE_STOPPED -> "STATE_STOPPED"
+                else -> "Other state: ${playbackState.state}"
+            }
+            if (playbackState.state == PlaybackStateCompat.STATE_PLAYING) {
+                btnPlayPause.text = "Pause"
+            } else {
+                btnPlayPause.text = "Play"
+            }
+        }
+
+        viewModel.mediaMetadata.observe(this) { metadata ->
+            if (metadata == null) {
+                tvTitle.text = "Loading Title"
+                tvSubtitle.text = "Loading Subtitle"
+            } else {
+                tvTitle.text = metadata.description.title ?: "null"
+                tvSubtitle.text = metadata.description.subtitle ?: "null"
             }
         }
 
